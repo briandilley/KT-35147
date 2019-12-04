@@ -1,0 +1,125 @@
+
+String NATIVE_SRC_DIR = "src/main/jni"
+String NATIVE_SRC_JNI_INCLUDE_DIR = "src/main/jni/generated"
+String NATIVE_BUILD_DIR = "src/main/jni/cmake-build-release"
+String NATIVE_OUTPUT_DIR = "src/main/resources/native/lib"
+
+buildscript {
+
+	// global project settings here
+	ext {
+		set('kotlinVersion', '1.3.61')
+	}
+
+
+	repositories {
+		mavenCentral()
+		maven { url "https://plugins.gradle.org/m2/" }
+	}
+	dependencies {
+		classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
+		classpath("org.jetbrains.kotlin:kotlin-allopen:${kotlinVersion}")
+		classpath("gradle.plugin.gradle-plugins:jartest:1.0.1")
+		classpath("com.adarshr:gradle-test-logger-plugin:1.6.0")
+	}
+}
+
+apply plugin: 'kotlin'
+apply plugin: 'com.github.hauner.jarTest'
+apply plugin: 'com.adarshr.test-logger'
+
+group = 'com.kotlinbug'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '1.8'
+
+test {
+	useJUnitPlatform()
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+	implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+	testImplementation 'org.junit.jupiter:junit-jupiter-api:5.5.2'
+	testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.5.2'
+}
+
+compileKotlin {
+	kotlinOptions {
+		freeCompilerArgs = ['-Xjsr305=strict']
+		jvmTarget = '1.8'
+	}
+}
+
+compileTestKotlin {
+	kotlinOptions {
+		freeCompilerArgs = ['-Xjsr305=strict']
+		jvmTarget = '1.8'
+	}
+}
+
+
+
+/**
+ * Generates header files for native methods.
+ */
+ext.javah = { String classpath, String outputDir, String classes ->
+	exec {
+		commandLine "sh", "tools/gjavah.sh", "-d", outputDir, "-classpath", classpath, classes
+	}
+}
+
+/**
+ * Copies native binaries
+ */
+ext.copyNatives = { String os, String type ->
+	copy {
+		from NATIVE_BUILD_DIR
+		include type
+		into NATIVE_OUTPUT_DIR + "/" + os
+		eachFile {
+			path = name
+		}
+		includeEmptyDirs = false
+	}
+	fileTree("${projectDir}/${NATIVE_OUTPUT_DIR}/${os}/").files.each { it ->
+		File file = it.absoluteFile
+		exec {
+			commandLine "zip", "-1", "-o", "-u", "-j", "${projectDir}/${NATIVE_OUTPUT_DIR}/libs-${os}.zip", file
+		}
+	}
+	file(NATIVE_OUTPUT_DIR + "/" + os).deleteDir()
+}
+
+// tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile)
+tasks.withType(JavaCompile) {
+	//options.compilerArgs += ['-h', file( "src/main/jni/src/jni/generated-ref")]
+	inputs.files(fileTree(NATIVE_SRC_DIR))
+	inputs.files(fileTree(NATIVE_SRC_JNI_INCLUDE_DIR))
+	outputs.dirs(NATIVE_OUTPUT_DIR)
+	doLast {
+		javah((sourceSets.main.runtimeClasspath + sourceSets.main.output).asPath,
+				NATIVE_SRC_JNI_INCLUDE_DIR,
+				sourceSets.main.output.asFileTree.matching { include "**/*.class" }.join(" "))
+		exec {
+			workingDir NATIVE_SRC_DIR
+			commandLine "sh", "./build.sh", "release"
+		}
+		copyNatives("darwin-x86_64", "**/*.dylib")
+		copyNatives("linux-x86_64", "**/*.so")
+		copyNatives("linux-x86_64", "**/*.so.*")
+		copyNatives("windows-x86_64", "**/*.dll")
+	}
+}
+
+clean {
+	doLast {
+		followSymlinks = true
+		delete file(NATIVE_BUILD_DIR)
+		delete file(NATIVE_SRC_JNI_INCLUDE_DIR)
+		delete file(NATIVE_OUTPUT_DIR)
+	}
+}

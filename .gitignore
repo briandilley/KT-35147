@@ -1,0 +1,36 @@
+.gradle
+/build/
+!gradle/wrapper/gradle-wrapper.jar
+hs_err_pid*
+audio.out
+video.out
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+build/
+bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### Vagrant ###
+.vagrant
+linux_64/
+windows_64/
