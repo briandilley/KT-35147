@@ -2,8 +2,8 @@
 /build/
 !gradle/wrapper/gradle-wrapper.jar
 hs_err_pid*
-audio.out
-video.out
+src/main/resources/native/lib/libs-*.zip
+src/main/jni/cmake-build-release
 
 ### STS ###
 .apt_generated
